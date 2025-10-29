@@ -1,0 +1,6 @@
+parameter,value
+package_name,test
+repo_url,hts://github.com/
+repo_mode,clone
+tree_output,true
+max_depth,3

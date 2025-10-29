@@ -1,0 +1,5 @@
+parameter,value
+package_name,test
+repo_url,https://github.com/
+repo_mode,clone
+tree_output,True
