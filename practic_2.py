@@ -2,6 +2,8 @@ import csv
 import sys
 import os
 from urllib.parse import urlparse
+from urllib.request import urlopen
+from urllib.error import URLError
 
 def validate_package_name(name):
     return isinstance(name, str) and len(name.strip()) > 0
@@ -79,18 +81,76 @@ def load_config(config_path, exception_test: bool):
     return config
 
 
+def text_dependances_block(url):
+    if ".git" in url:
+        url = url[:-4]
+    if "github.com" in url:
+        url = url.replace("github.com", "raw.githubusercontent.com")
+        for branch in ["main", "master"]:
+            try:
+                with urlopen(f"{url}/{branch}/pom.xml") as r:
+                    return r.read().decode("utf-8")
+            except URLError:
+                continue
+        raise Exception("pom.xml not found")
+    else:
+        with urlopen(url) as r:
+            return r.read().decode("utf-8")
+    
+
+
+def text_beetwen_tags(text, tag):
+    start_tag = f'<{tag}>'
+    end_tag = f'</{tag}>'
+    try:
+        start = text.index(start_tag) + len(start_tag)
+        end = text.index(end_tag)
+        return text[start:end].strip()
+    except ValueError:
+        return None
+    
+
+def dependancy_args(text):
+    deps = []
+    start_tag = "<dependency>"
+    end_tag = "</dependency>"
+
+    i = 0
+    while True:
+        start = text.find(start_tag, i)
+        if start == -1: break
+        end = text.find(end_tag, start)
+        if end == -1: break
+        dep_block = text[start:end].strip()
+
+        group = text_beetwen_tags(dep_block, "groupId")
+        artifact = text_beetwen_tags(dep_block, "artifactId")
+        version = text_beetwen_tags(dep_block, "version")
+
+        if group and artifact:
+            deps.append((group, artifact, version or "unknown"))
+        i = end + len(end_tag)
+
+    return deps
+
+
 def check_exception():
     config_name = ''
-    for i in range(8):
+    for i in range(7):
         config_name = 'exception' + f'{i}' + '.csv'
         config = load_config(config_name, 1)
 
 def main():
     config = load_config('parametres.csv', 0)
+    content = text_dependances_block(config["repo_url"])
+    deps = dependancy_args(content)
+    repo_name = config["repo_url"].split("/")[-1]
+    if ".git" in repo_name:
+        repo_name = repo_name[:-4]
+    print(f"dependences {repo_name}:")
+    for dep in deps:
+        print("\t" + dep[1])
 
-    print("Настройки приложения:")
-    for key, value in config.items():
-        print(f"{key}: {value}")
 
 if __name__ == "__main__":
     main()
